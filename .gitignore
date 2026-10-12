@@ -1,0 +1,189 @@
+# Node
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Env
+.env
+.env.*
+!.env.example
+
+# Build
+dist/
+build/
+
+# Logs
+logs/
+*.log
+
+# Coverage
+coverage/
+
+# OS / Editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# Uploads / generated files
+uploads/
+public/uploads/
+
+# Cache
+.cache/
+.parcel-cache/
+
+# Python leftovers if any
+__pycache__/
+*.pyc
+
+# Database dumps / backups
+*.sql
+*.dump
+*.bak
+*.backup
+
+# Certificates / secrets
+*.pem
+*.key
+*.crt
+*.pfx
+*.p12
+
+# Excel / generated exports
+exports/
+
+# Respaldos locales con fecha
+*.bak_*
+*_bak_*
+*.backup_*
+
+# Datos y respaldos CHIYU generados en ejecución
+backend/storage/
+
+# Respaldos locales del frontend
+frontend/src_bak_*/
+frontend/m_*
+
+# Llaves o credenciales locales
+S1st3mas25*
+
+# Respaldos comprimidos
+*.tar
+*.tar.gz
+*.tgz
+*.zip
+
+# Respaldos de código con sufijos
+*.bak-*
+*.bak_*
+*.backup-*
+*.backup_*
+*_bak_*
+
+# Archivos Excel: datos y exportaciones operativas
+*.xls
+*.xlsx
+
+# =========================================================
+# Exclusiones adicionales para publicacion de BioSYS en GitHub
+# =========================================================
+
+# Directorios de herramientas y caches locales
+.vscode-server/
+.npm/
+.cache/
+
+# Dependencias y compilaciones
+**/node_modules/
+**/dist/
+**/build/
+coverage/
+
+# Configuracion local y secretos
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+
+# Datos operativos y archivos generados
+backend/storage/
+backend/uploads/
+uploads/
+exports/
+*.sql
+*.sql.gz
+*.dump
+*.bak
+*.backup
+*.tar
+*.tar.gz
+*.tgz
+*.zip
+*.xls
+*.xlsx
+
+# Respaldos de codigo
+*.bak-*
+*.bak_*
+*.backup-*
+*.backup_*
+*_bak_*
+frontend/src_bak_*/
+frontend/m_*
+
+# Archivos temporales
+*.log
+*.tmp
+.DS_Store
+Thumbs.db
+
+# =========================================================
+# Variantes antiguas y respaldos de codigo
+# =========================================================
+*_old
+*_old.*
+*_new
+*_new.*
+*_AD
+*_AD.*
+*_MDU
+*_MDU.*
+*_ADPD
+*_ADPD.*
+*_DISA
+*_DISA.*
+*_ol
+*_ol.*
+
+# Respaldos y pruebas de extraccion operativa
+backend/export_junio_2026_desde_db.js
+backend/manual_extract_may_2026.js
+backend/service/manual_extract_may_2026.js
+backend/createUser.js
+backend/scripts/run_monthly_now.js_old
+
+# Variantes antiguas adicionales
+*_old*
+*_OLD*
+*_new*
+*_NEW*
+*_AD*
+*_MDU*
+*_DISA*
+*_ol*
+*_simple
+
+# Archivos personales: firmas
+frontend/src/assets/firmaCasasola.png
+frontend/src/assets/firmaEstuardo.png

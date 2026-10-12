@@ -1,0 +1,270 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ======================================================
+   GLOBAL (pantalla)
+   ====================================================== */
+
+* { box-sizing: border-box; }
+
+html, body, #root {
+  height: 100%;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+/* ✅ Fuerza UI clara */
+:root {
+  font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
+  line-height: 1.5;
+  font-weight: 400;
+
+  color-scheme: light;
+  color: #0f172a;
+  background-color: #ffffff;
+
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+
+  --filter-bg: #eaf5ff;
+  --filter-border: #b9ddff;
+  --input-bg: #ffffff;
+  --input-border: #cbd5e1;
+  --focus-ring: rgba(59,130,246,0.25);
+
+  --btn-primary: #4f46e5;
+  --btn-primary-hover: #4338ca;
+
+  --btn-success: #059669;
+  --btn-success-hover: #047857;
+
+  --btn-dark: #0f172a;
+  --btn-dark-hover: #111827;
+
+  --btn-light: #bae6fd;
+  --btn-light-hover: #7dd3fc;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+  display: block;
+}
+
+/* Links */
+a { color: inherit; text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+/* Helpers */
+.only-print { display: none !important; }
+.no-print { display: block; }
+
+/* ======================================================
+   Tailwind/shadcn variables
+   ====================================================== */
+
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 222.2 84% 4.9%;
+    --card: 0 0% 100%;
+    --card-foreground: 222.2 84% 4.9%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222.2 84% 4.9%;
+    --primary: 222.2 47.4% 11.2%;
+    --primary-foreground: 210 40% 98%;
+    --secondary: 210 40% 96.1%;
+    --secondary-foreground: 222.2 47.4% 11.2%;
+    --muted: 210 40% 96.1%;
+    --muted-foreground: 215.4 16.3% 46.9%;
+    --accent: 210 40% 96.1%;
+    --accent-foreground: 222.2 47.4% 11.2%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 214.3 31.8% 91.4%;
+    --input: 214.3 31.8% 91.4%;
+    --ring: 222.2 84% 4.9%;
+    --radius: 0.5rem;
+  }
+
+  * { @apply border-border; }
+  body { @apply bg-background text-foreground; }
+}
+
+/* ======================================================
+   PRINT / PDF — MOTOR DEFINITIVO (sin visibility)
+   ====================================================== */
+@media print {
+  @page { size: letter landscape; margin: 10mm; }
+
+    .no-print { display: none !important; }
+  .only-print { display: block !important; }
+
+   #print-area { width: 100% !important; }
+
+
+  html, body, #root {
+    height: auto !important;
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow: hidden !important; /* ✅ evita que algo empuje hacia la derecha */
+  }
+
+  body {
+    display: block !important;
+    background: #fff !important;
+  }
+
+  /* ✅ fuera TODO lo que no se imprime */
+  .no-print { display: none !important; }
+  .only-print { display: block !important; }
+
+  #print-area {
+    display: block !important;
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  /* ✅ Cada página se corta limpia */
+  .print-page {
+    width: 100% !important;
+    max-width: 100% !important;
+    break-after: auto !important;
+    page-break-after: always !important;
+
+    /* ❌ NO bloquees cortes en TODO el contenedor (eso causa bugs) */
+    break-inside: auto !important;
+    page-break-inside: auto !important;
+  }
+  .print-page:last-child {
+    break-after: auto !important;
+    page-break-after: auto !important;
+  }
+
+  /* ✅ salto REAL si usas .page-break (ya no es obligatorio con lo de arriba) */
+  .page-break {
+    break-after: page !important;
+    page-break-after: always !important;
+    display: block !important;
+    height: 0 !important;
+  }
+    thead { display: table-header-group; }
+
+  /* ✅ Encabezado por página */
+  thead { display: table-header-group; }
+  tfoot { display: table-footer-group; }
+
+  /* ===== TABLE ===== */
+  table.print-table {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    table-layout: fixed !important;
+    border-collapse: collapse !important;
+    border: 1px solid #cbd5e1 !important;
+  }
+
+  table.print-table th,
+  table.print-table td {
+    border: 1px solid #cbd5e1 !important;
+    padding: 6px 8px !important;
+    font-size: 10.5px !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    white-space: nowrap !important;
+  }
+
+  table.print-table thead th {
+    background: #f3f4f6 !important;
+    font-weight: 800 !important;
+  }
+
+  /* ✅ Evita cortes feos SOLO donde importa */
+  .print-head,
+  .print-signatures,
+  tr {
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+  }
+
+  /* ===== HEADER ===== */
+  .print-head {
+    display: flex !important;
+    justify-content: space-between !important;
+    align-items: flex-start !important;
+    gap: 12px !important;
+    margin-bottom: 8px !important;
+  }
+
+  .print-head-right {
+    text-align: right !important;
+    font-size: 10.5px !important;
+    color: #334155 !important;
+    white-space: nowrap !important;
+  }
+
+  .print-pagecount {
+    font-weight: 800 !important;
+    margin-top: 2px !important;
+  }
+
+  /* ===== SIGNATURES ===== */
+  .print-signatures {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr !important;
+    column-gap: 12mm !important;
+    align-items: start !important;
+    margin-top: 8mm !important;
+
+    /* ✅ QUITA padding extra (ya tienes margen de @page) */
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+  }
+
+  .print-signatures > div:first-child { justify-self: start !important; }
+  .print-signatures > div:last-child  { justify-self: end !important; text-align: right !important; }
+
+  .sig-img {
+    width: 78mm !important;
+    max-height: 32mm !important;
+    height: auto !important;
+    object-fit: contain !important;
+    display: inline-block !important;
+  }
+
+    /* =========================================
+   SCROLL INVISIBLE (Dashboard)
+   ========================================= */
+
+.scroll-invisible {
+  overflow-y: auto;
+  overflow-x: hidden;
+  height: 100%;
+  scrollbar-width: none;        /* Firefox */
+  -ms-overflow-style: none;     /* IE y Edge viejo */
+}
+
+.scroll-invisible::-webkit-scrollbar {
+  display: none;                /* Chrome, Edge, Safari */
+}
+
+.dashboard-scroll {
+  min-height: 100vh;
+  height: 100vh;
+  overflow-y: auto;
+  overflow-x: hidden;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  scroll-behavior: smooth;
+  padding-bottom: 32px;
+}
+
+
+}

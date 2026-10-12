@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="400" height="100" viewBox="0 0 400 100">
+  <rect width="400" height="100" fill="white" fill-opacity="0"/>
+  <line x1="20" y1="72" x2="380" y2="72" stroke="#888888" stroke-width="1"/>
+  <text x="200" y="55" text-anchor="middle" font-family="Arial, sans-serif" font-size="13" fill="#666666">Firma no incluida en el repositorio</text>
+</svg>
