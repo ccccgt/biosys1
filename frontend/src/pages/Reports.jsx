@@ -99,6 +99,7 @@ export default function Reports() {
     mode: "all",
     name_like: "",
     terminal_like: "",
+    department: "",
   });
 
   const [selectedDateInput, setSelectedDateInput] = useState("");
@@ -524,6 +525,7 @@ export default function Reports() {
       mode: "all",
       name_like: "",
       terminal_like: "",
+      department: "",
     });
 
     setSelectedDateInput("");
@@ -597,6 +599,11 @@ export default function Reports() {
     params.set(
       "terminal_like",
       filters.terminal_like || ""
+    );
+
+    params.set(
+      "department",
+      filters.department || ""
     );
 
     params.set(
@@ -1493,6 +1500,27 @@ export default function Reports() {
                 <option value="hourly">
                   Imprimir 1 marcaje por hora/persona
                 </option>
+              </select>
+            </div>
+
+            {/* Departamento */}
+            <div>
+              <label className="text-sm text-slate-600">
+                Departamento
+              </label>
+              <select
+                value={filters.department}
+                onChange={(e) => onChange("department", e.target.value)}
+                className="w-full mt-1 border rounded-lg p-2 bg-sky-50"
+              >
+                <option value="">Todos los departamentos</option>
+                <option value="Salas">Salas</option>
+                <option value="Fiscales">Fiscales</option>
+                <option value="Oficiales">Oficiales</option>
+                <option value="Analistas">Analistas</option>
+                <option value="Sistemas">Sistemas</option>
+                <option value="Pilotos">Pilotos</option>
+                <option value="Administrativo">Administrativo</option>
               </select>
             </div>
 

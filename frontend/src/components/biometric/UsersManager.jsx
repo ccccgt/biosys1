@@ -453,12 +453,20 @@ export default function UsersManager() {
 
                 <div>
                   <label className="block text-sm text-slate-600 mb-1">Departamento</label>
-                  <input
-                    type="text"
+                  <select
                     value={form.department}
                     onChange={(e) => updateForm("department", e.target.value)}
-                    className="w-full px-3 py-2 rounded-lg border border-slate-300"
-                  />
+                    className="w-full px-3 py-2 rounded-lg border border-slate-300 bg-white"
+                  >
+                    <option value="">Sin departamento</option>
+                    <option value="Salas">Salas</option>
+                    <option value="Fiscales">Fiscales</option>
+                    <option value="Oficiales">Oficiales</option>
+                    <option value="Analistas">Analistas</option>
+                    <option value="Sistemas">Sistemas</option>
+                    <option value="Pilotos">Pilotos</option>
+                    <option value="Administrativo">Administrativo</option>
+                  </select>
                 </div>
 
                 <div>

@@ -1,5 +1,6 @@
 const db = require("../config/db");
 const ExcelJS = require("exceljs");
+const { performance } = require("node:perf_hooks");
 
 /* ===================================================== */
 /* Helpers */
@@ -182,7 +183,7 @@ function buildActiveEmployeesSql() {
 /* FUENTES DE DATOS */
 /* ===================================================== */
 
-async function buildUnionSql(start, end) {
+async function buildUnionSql(start, end, earlyFilters = {}) {
   const historicalTables = await getHistoricalTablesForRange(
     start,
     end
@@ -193,6 +194,55 @@ async function buildUnionSql(start, end) {
   const tablesUsed = [];
 
   /*
+   * Optimización segura:
+   * Estos filtros utilizan columnas que forman parte de la clave
+   * de deduplicación original.
+   *
+   * Se aplican en cada fuente para reducir las filas procesadas
+   * por ROW_NUMBER(), manteniendo también los filtros finales.
+   */
+  const buildEarlySourceFilters = () => {
+    const clauses = [];
+    const values = [];
+
+    if (
+      earlyFilters.device_id !== undefined &&
+      earlyFilters.device_id !== ""
+    ) {
+      clauses.push("device_id = ?");
+      values.push(Number(earlyFilters.device_id));
+    }
+
+    if (
+      earlyFilters.door_number !== undefined &&
+      earlyFilters.door_number !== ""
+    ) {
+      clauses.push("door_number = ?");
+      values.push(Number(earlyFilters.door_number));
+    }
+
+    if (
+      earlyFilters.in_out !== undefined &&
+      earlyFilters.in_out !== ""
+    ) {
+      clauses.push("in_out = ?");
+      values.push(Number(earlyFilters.in_out));
+    }
+
+    if (earlyFilters.terminal_like) {
+      clauses.push("terminal LIKE ?");
+      values.push(`%${String(earlyFilters.terminal_like).trim()}%`);
+    }
+
+    return {
+      sql: clauses.length
+        ? ` AND ${clauses.join(" AND ")}`
+        : "",
+      params: values,
+    };
+  };
+
+  /*
    * Fuente histórica mensual.
    *
    * Esta sigue teniendo prioridad sobre registros_live.
@@ -200,6 +250,8 @@ async function buildUnionSql(start, end) {
    * sobreviva a la deduplicación.
    */
   for (const t of historicalTables) {
+    const sourceFilters = buildEarlySourceFilters();
+
     parts.push(`
       SELECT
         id,
@@ -215,10 +267,10 @@ async function buildUnionSql(start, end) {
         created_at,
         1 AS source_priority
       FROM \`${t}\`
-      WHERE date BETWEEN ? AND ?
+      WHERE date BETWEEN ? AND ?${sourceFilters.sql}
     `);
 
-    params.push(start, end);
+    params.push(start, end, ...sourceFilters.params);
     tablesUsed.push(t);
   }
 
@@ -237,6 +289,8 @@ async function buildUnionSql(start, end) {
    * únicamente cuando el registro no existe allí.
    */
   if (await tableExists("registros_live")) {
+    const sourceFilters = buildEarlySourceFilters();
+
     parts.push(`
       SELECT
         id,
@@ -252,10 +306,10 @@ async function buildUnionSql(start, end) {
         created_at,
         2 AS source_priority
       FROM registros_live
-      WHERE date BETWEEN ? AND ?
+      WHERE date BETWEEN ? AND ?${sourceFilters.sql}
     `);
 
-    params.push(start, end);
+    params.push(start, end, ...sourceFilters.params);
     tablesUsed.push("registros_live");
   }
 
@@ -315,7 +369,12 @@ async function buildFilteredBaseSql(query) {
     unionSql,
     params: baseParams,
     tablesUsed,
-  } = await buildUnionSql(start, end);
+  } = await buildUnionSql(start, end, {
+    device_id,
+    door_number,
+    in_out,
+    terminal_like,
+  });
 
   const activeEmpSql = buildActiveEmployeesSql();
 
@@ -556,6 +615,8 @@ exports.attendanceReport = async (req, res) => {
 
     const offset = (p - 1) * ps;
 
+    const buildStart = performance.now();
+
     const {
       baseSql,
       params,
@@ -566,46 +627,23 @@ exports.attendanceReport = async (req, res) => {
       end,
     });
 
+    console.info("[BioSYS Reports][attendanceReport]", {
+      phase: "buildFilteredBaseSql",
+      elapsed_ms: Math.round((performance.now() - buildStart) * 100) / 100,
+      start,
+      end,
+      mode,
+      tables_used: tablesUsed,
+    });
+
     if (mode === "first_last") {
-      const countSql = `
-        WITH base AS (${baseSql}),
-        ranked AS (
-          SELECT
-            b.*,
-            ROW_NUMBER() OVER (
-              PARTITION BY
-                b.employee_id,
-                b.date
-              ORDER BY
-                b.time ASC,
-                b.id ASC
-            ) AS rn_asc,
-            ROW_NUMBER() OVER (
-              PARTITION BY
-                b.employee_id,
-                b.date
-              ORDER BY
-                b.time DESC,
-                b.id DESC
-            ) AS rn_desc
-          FROM base b
-        )
-        SELECT COUNT(*) AS total
-        FROM ranked r
-        WHERE
-          r.rn_asc = 1
-          OR r.rn_desc = 1
-      `;
-
-      const [countRows] = await db.query(
-        countSql,
-        params
-      );
-
-      const total = Number(
-        countRows?.[0]?.total || 0
-      );
-
+      /*
+       * Optimización:
+       * - Calcula primera y última marcación en una consulta de datos.
+       * - Obtiene el total con COUNT(*) OVER().
+       * - Mantiene baseSql, params, filtros, deduplicación y orden.
+       * - Si la página está vacía, consulta el total como respaldo.
+       */
       const dataSql = `
         WITH base AS (${baseSql}),
         ranked AS (
@@ -628,28 +666,103 @@ exports.attendanceReport = async (req, res) => {
                 b.id DESC
             ) AS rn_desc
           FROM base b
+        ),
+        first_last AS (
+          SELECT *
+          FROM ranked
+          WHERE
+            rn_asc = 1
+            OR rn_desc = 1
+        ),
+        counted AS (
+          SELECT
+            fl.*,
+            COUNT(*) OVER() AS __total_count
+          FROM first_last fl
         )
         SELECT
-          r.*,
+          c.*,
           dd.door_name
-        FROM ranked r
+        FROM counted c
         LEFT JOIN device_doors dd
-          ON dd.device_id = r.device_id
-         AND dd.door_number = r.door_number
-        WHERE
-          r.rn_asc = 1
-          OR r.rn_desc = 1
+          ON dd.device_id = c.device_id
+         AND dd.door_number = c.door_number
         ORDER BY
-          r.date DESC,
-          r.employee_id ASC,
-          r.time ASC
+          c.date DESC,
+          c.employee_id ASC,
+          c.time ASC
         LIMIT ? OFFSET ?
       `;
+
+      const dataStart = performance.now();
 
       const [rows] = await db.query(
         dataSql,
         [...params, ps, offset]
       );
+
+      let total = rows.length
+        ? Number(rows[0].__total_count || 0)
+        : 0;
+
+      /*
+       * COUNT(*) OVER() no devuelve el total cuando la página solicitada
+       * está vacía. En ese caso se ejecuta la consulta de conteo original.
+       */
+      if (rows.length === 0) {
+        const countSql = `
+          WITH base AS (${baseSql}),
+          ranked AS (
+            SELECT
+              b.*,
+              ROW_NUMBER() OVER (
+                PARTITION BY
+                  b.employee_id,
+                  b.date
+                ORDER BY
+                  b.time ASC,
+                  b.id ASC
+              ) AS rn_asc,
+              ROW_NUMBER() OVER (
+                PARTITION BY
+                  b.employee_id,
+                  b.date
+                ORDER BY
+                  b.time DESC,
+                  b.id DESC
+              ) AS rn_desc
+            FROM base b
+          )
+          SELECT COUNT(*) AS total
+          FROM ranked r
+          WHERE
+            r.rn_asc = 1
+            OR r.rn_desc = 1
+        `;
+
+        const [countRows] = await db.query(countSql, params);
+        total = Number(countRows?.[0]?.total || 0);
+      }
+
+      console.info("[BioSYS Reports][attendanceReport]", {
+        phase: "data_with_count",
+        elapsed_ms: Math.round((performance.now() - dataStart) * 100) / 100,
+        mode,
+        start,
+        end,
+        page: p,
+        pageSize: ps,
+        rows_returned: rows.length,
+        total,
+      });
+
+      /*
+       * El campo auxiliar solo se usa internamente para obtener el total.
+       * No se envía en cada fila de la respuesta de la API.
+       */
+      for (const row of rows) {
+        delete row.__total_count;
+      }
 
       return res.json({
         page: p,
@@ -665,10 +778,20 @@ exports.attendanceReport = async (req, res) => {
       FROM (${baseSql}) c
     `;
 
+    const countStart = performance.now();
+
     const [countRows] = await db.query(
       countSql,
       params
     );
+
+    console.info("[BioSYS Reports][attendanceReport]", {
+      phase: "count",
+      elapsed_ms: Math.round((performance.now() - countStart) * 100) / 100,
+      mode,
+      start,
+      end,
+    });
 
     const total = Number(
       countRows?.[0]?.total || 0
@@ -689,10 +812,23 @@ exports.attendanceReport = async (req, res) => {
       LIMIT ? OFFSET ?
     `;
 
+    const dataStart = performance.now();
+
     const [rows] = await db.query(
       dataSql,
       [...params, ps, offset]
     );
+
+    console.info("[BioSYS Reports][attendanceReport]", {
+      phase: "data",
+      elapsed_ms: Math.round((performance.now() - dataStart) * 100) / 100,
+      mode,
+      start,
+      end,
+      page: p,
+      pageSize: ps,
+      rows_returned: rows.length,
+    });
 
     return res.json({
       page: p,
