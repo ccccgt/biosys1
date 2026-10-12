@@ -1,6 +1,15 @@
 const express = require("express");
 const router = express.Router();
 const db = require("../config/db");
+const path = require("path");
+const { spawn } = require("child_process");
+const {
+  verifyToken,
+  checkPermission,
+} = require("../middleware/authMiddleware");
+
+let chiyuSyncRunning = false;
+
 
 const TABLES_TO_CHECK = ["registros_01_2026", "registros_02_2026"];
 const RANGE_START = "2026-01-01";
@@ -363,5 +372,120 @@ router.post("/run/auto-inactive", async (req, res) => {
     });
   }
 });
+
+
+// =====================================================
+// SINCRONIZAR USUARIOS BIOMÉTRICOS CHIYU EN TIEMPO REAL
+// Utiliza el importador oficial existente; no duplica su lógica.
+// =====================================================
+router.post(
+  "/sync/chiyu/stream",
+  verifyToken,
+  checkPermission("biometric_users_enabled"),
+  (req, res) => {
+    if (chiyuSyncRunning) {
+      return res.status(409).json({
+        ok: false,
+        message: "Ya existe una sincronización biométrica en ejecución.",
+      });
+    }
+
+    chiyuSyncRunning = true;
+
+    res.status(200);
+    res.setHeader("Content-Type", "text/plain; charset=utf-8");
+    res.setHeader("Cache-Control", "no-cache, no-transform");
+    res.setHeader("X-Accel-Buffering", "no");
+    res.setHeader("Connection", "keep-alive");
+
+    if (typeof res.flushHeaders === "function") {
+      res.flushHeaders();
+    }
+
+    let child;
+    let finalized = false;
+
+    const finish = (message) => {
+      if (finalized) return;
+      finalized = true;
+      chiyuSyncRunning = false;
+
+      if (message && !res.destroyed && !res.writableEnded) {
+        res.write(message);
+      }
+
+      if (!res.destroyed && !res.writableEnded) {
+        res.end();
+      }
+    };
+
+    try {
+      const backendDirectory = path.resolve(__dirname, "..");
+      const scriptPath = path.join(
+        backendDirectory,
+        "scripts",
+        "import-chiyu-users.js"
+      );
+
+      res.write(
+        "====================================================\n" +
+        "BIOSYS 1.0 - SINCRONIZACIÓN DE USUARIOS CHIYU\n" +
+        "====================================================\n" +
+        "Iniciando el importador oficial...\n\n"
+      );
+
+      child = spawn(
+        process.execPath,
+        [scriptPath, "--apply"],
+        {
+          cwd: backendDirectory,
+          env: process.env,
+          stdio: ["ignore", "pipe", "pipe"],
+        }
+      );
+
+      child.stdout.on("data", (chunk) => {
+        if (!res.destroyed && !res.writableEnded) {
+          res.write(chunk);
+        }
+      });
+
+      child.stderr.on("data", (chunk) => {
+        if (!res.destroyed && !res.writableEnded) {
+          res.write(chunk);
+        }
+      });
+
+      child.on("error", (error) => {
+        finish(
+          "\n[ERROR AL INICIAR EL IMPORTADOR] " +
+          String(error.message || error) +
+          "\n"
+        );
+      });
+
+      child.on("close", (code, signal) => {
+        const result =
+          code === 0
+            ? "EXITOSO"
+            : "FALLIDO";
+
+        finish(
+          `\n[RESULTADO: ${result}]` +
+          `\n[CÓDIGO DE SALIDA: ${code}]` +
+          (signal ? `\n[SEÑAL: ${signal}]` : "") +
+          "\n"
+        );
+      });
+    } catch (error) {
+      finish(
+        "\n[ERROR DEL SERVIDOR] " +
+        String(error.message || error) +
+        "\n"
+      );
+    }
+  }
+);
+
 
 module.exports = router;
