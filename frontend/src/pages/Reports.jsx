@@ -1694,10 +1694,25 @@ export default function Reports() {
                         ? `${r.device_id}-${r.id}`
                         : `${r.device_id}-${r.employee_id}-${r.date}-${r.time}-${idx}`;
 
+                    const timeText = String(r.time || "");
+                    const timeParts = timeText.split(":");
+                    const currentSeconds =
+                      Number(timeParts[0]) * 3600 +
+                      Number(timeParts[1]) * 60 +
+                      Number(timeParts[2] || 0);
+
+                    const isLateFirstPunch =
+                      Number(r.first_punch_rank) === 1 &&
+                      currentSeconds >= 8 * 3600;
+
                     return (
                       <tr
                         key={rowKey}
-                        className="border-t"
+                        className={`border-t ${
+                          isLateFirstPunch
+                            ? "text-red-600 font-semibold"
+                            : ""
+                        }`}
                       >
                         <td className="p-3">
                           {String(

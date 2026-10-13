@@ -800,7 +800,11 @@ exports.attendanceReport = async (req, res) => {
     const dataSql = `
       SELECT
         x.*,
-        dd.door_name
+        dd.door_name,
+        ROW_NUMBER() OVER (
+          PARTITION BY x.employee_id, x.date
+          ORDER BY x.time ASC, x.id ASC
+        ) AS first_punch_rank
       FROM (${baseSql}) x
       LEFT JOIN device_doors dd
         ON dd.device_id = x.device_id
@@ -980,7 +984,10 @@ exports.exportAttendanceXlsx = async (req, res) => {
       sql = `
         SELECT
           x.*,
-          dd.door_name
+          dd.door_name,
+          MIN(TIME_TO_SEC(x.time)) OVER (
+            PARTITION BY x.employee_id, x.date
+          ) AS first_punch_seconds
         FROM (${baseSql}) x
         LEFT JOIN device_doors dd
           ON dd.device_id = x.device_id
