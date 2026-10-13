@@ -1702,7 +1702,10 @@ export default function Reports() {
                       Number(timeParts[2] || 0);
 
                     const isLateFirstPunch =
-                      Number(r.first_punch_rank) === 1 &&
+                      (
+                        Number(r.first_punch_rank) === 1 ||
+                        Number(r.rn_asc) === 1
+                      ) &&
                       currentSeconds >= 8 * 3600;
 
                     return (
