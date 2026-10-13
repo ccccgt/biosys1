@@ -1212,7 +1212,10 @@ exports.exportAttendanceData = async (
       sql = `
         SELECT
           x.*,
-          dd.door_name
+          dd.door_name,
+          MIN(TIME_TO_SEC(x.time)) OVER (
+            PARTITION BY x.employee_id, x.date
+          ) AS first_punch_seconds
         FROM (${baseSql}) x
         LEFT JOIN device_doors dd
           ON dd.device_id = x.device_id
