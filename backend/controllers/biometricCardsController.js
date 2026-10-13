@@ -3,6 +3,7 @@ const {
   normalizeCardId,
   searchCardOnDevices,
   changeCardStatusOnDevices,
+  deleteCardOnDevices,
 } = require("../service/chiyu.card.service");
 
 exports.searchEmployees = async (req, res) => {
@@ -132,6 +133,43 @@ exports.searchEmployees = async (req, res) => {
 
     return res.status(500).json({
       message: "Error buscando empleados",
+      detail: String(error?.message || error),
+    });
+  }
+};
+
+
+exports.deleteCard = async (req, res) => {
+  try {
+    const cardId = normalizeCardId(req.body?.card_id);
+
+    if (!cardId) {
+      return res.status(400).json({
+        ok: false,
+        message: "card_id es requerido.",
+      });
+    }
+
+    const devices = await deleteCardOnDevices(cardId);
+    const successful = devices.filter(
+      (device) => device.success
+    ).length;
+
+    return res.json({
+      ok: successful === devices.length,
+      partial_success:
+        successful > 0 && successful < devices.length,
+      card_id: cardId,
+      successful_devices: successful,
+      total_devices: devices.length,
+      devices,
+    });
+  } catch (error) {
+    console.error("Error eliminando usuario CHIYU:", error);
+
+    return res.status(500).json({
+      ok: false,
+      message: "Error eliminando el usuario en los dispositivos CHIYU.",
       detail: String(error?.message || error),
     });
   }

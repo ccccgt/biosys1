@@ -412,6 +412,151 @@ async function changeCardStatusOnDevices(
   return results;
 }
 
+
+
+/*
+ * Elimina un usuario de la base interna de un dispositivo CHIYU.
+ * La búsqueda previa obtiene el SELECT interno correspondiente
+ * a ese dispositivo. Después se verifica la eliminación.
+ */
+async function deleteCardOnDevice(device, cardId) {
+  const startedAt = Date.now();
+
+  const baseResult = {
+    device_id: device.id,
+    device_name: device.name,
+    ip_address: device.ip_address,
+    action: "delete",
+  };
+
+  try {
+    const before = await searchCardOnDevice(device, cardId);
+
+    if (before.connection !== "ok") {
+      return {
+        ...baseResult,
+        success: false,
+        before,
+        after: null,
+        error: "No fue posible consultar el dispositivo CHIYU.",
+      };
+    }
+
+    if (!before.exists) {
+      return {
+        ...baseResult,
+        success: true,
+        already_absent: true,
+        before,
+        after: before,
+        elapsed_ms: Date.now() - startedAt,
+        message: "El usuario ya no existe en este dispositivo.",
+      };
+    }
+
+    const internalId = normalizeCardId(before.internal_id);
+
+    if (!internalId) {
+      return {
+        ...baseResult,
+        success: false,
+        before,
+        after: null,
+        error: "No se obtuvo un identificador interno válido.",
+      };
+    }
+
+    const response = await axios.get(
+      `http://${device.ip_address}/if.cgi`,
+      {
+        params: {
+          redirect: "UserSet.htm",
+          failure: "fail.htm",
+          type: "delete",
+          SELECT: internalId,
+          "delete.x": 24,
+          "delete.y": 9,
+        },
+        auth: {
+          username: device.username,
+          password: device.password,
+        },
+        responseType: "arraybuffer",
+        timeout: 20000,
+        maxRedirects: 5,
+        validateStatus: (status) => status >= 200 && status < 400,
+        headers: {
+          Accept: "text/html,application/xhtml+xml",
+          "User-Agent": "BioSys-CHIYU/1.0",
+        },
+      }
+    );
+
+    // Dar tiempo al CHIYU para completar la eliminación.
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+
+    // Verificar el resultado mediante una nueva consulta.
+    const after = await searchCardOnDevice(device, cardId);
+
+    const success =
+      after.connection === "ok" &&
+      after.exists === false;
+
+    return {
+      ...baseResult,
+      success,
+      internal_id: internalId,
+      http_status: response.status,
+      before,
+      after,
+      elapsed_ms: Date.now() - startedAt,
+      error: success
+        ? null
+        : "No se pudo confirmar la eliminación del usuario en este dispositivo.",
+    };
+  } catch (error) {
+    return {
+      ...baseResult,
+      success: false,
+      elapsed_ms: Date.now() - startedAt,
+      error: String(error?.message || error),
+    };
+  }
+}
+
+/*
+ * Procesa los dispositivos CHIYU activos de forma secuencial.
+ * No detiene el proceso si falla un dispositivo: registra el
+ * resultado individual de cada uno para detectar eliminaciones
+ * parciales.
+ */
+async function deleteCardOnDevices(cardId) {
+  const normalizedCardId = normalizeCardId(cardId);
+
+  if (!normalizedCardId) {
+    throw new Error("Número de tarjeta inválido.");
+  }
+
+  const devices = await getActiveDevices();
+
+  if (!devices.length) {
+    throw new Error("No hay dispositivos CHIYU activos.");
+  }
+
+  const results = [];
+
+  for (const device of devices) {
+    const result = await deleteCardOnDevice(
+      device,
+      normalizedCardId
+    );
+
+    results.push(result);
+  }
+
+  return results;
+}
+
 module.exports = {
   normalizeCardId,
   getActiveDevices,
@@ -421,4 +566,6 @@ module.exports = {
   sendCardAction,
   changeCardStatusOnDevice,
   changeCardStatusOnDevices,
+  deleteCardOnDevice,
+  deleteCardOnDevices,
 };

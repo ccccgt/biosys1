@@ -9,6 +9,7 @@ import {
   Loader2,
   Fingerprint,
   X,
+  Trash2,
 } from "lucide-react";
 
 import { api } from "../../services/api";
@@ -219,6 +220,86 @@ export default function CardManager() {
     }
   }
 
+
+  async function deleteCardFromDevices() {
+    const cardId = getEmployeeCardId(selectedEmployee);
+
+    if (!cardId) {
+      await alertError(
+        "El empleado seleccionado no tiene una tarjeta ni un ID biométrico válido."
+      );
+      return;
+    }
+
+    const employeeName =
+      selectedEmployee?.full_name || "el usuario seleccionado";
+
+    const confirmation = await alertConfirm(
+      `¿Confirmas eliminar permanentemente a ${employeeName}, `
+      + `con tarjeta/ID ${cardId}, de todos los dispositivos CHIYU activos? `
+      + "Esta acción no se puede deshacer."
+    );
+
+    if (!confirmation.isConfirmed) return;
+
+    setActionState({ action: "delete" });
+
+    try {
+      const response = await api.post(
+        "/api/biometric-cards/delete",
+        { card_id: cardId },
+        { timeout: 90000 }
+      );
+
+      const results = Array.isArray(response.data?.devices)
+        ? response.data.devices
+        : [];
+
+      const failures = results.filter(
+        (device) => !device.success
+      );
+
+      if (response.data?.ok !== true) {
+        const details = failures
+          .map(
+            (device) =>
+              `${device.device_name || "Dispositivo"}: `
+              + `${device.error || "No se confirmó la eliminación"}`
+          )
+          .join("\n");
+
+        await alertError(
+          "La eliminación no se completó en todos los dispositivos. "
+          + "Revisa el resultado de cada equipo.\n"
+          + details
+        );
+
+        await checkCardStatus(selectedEmployee);
+        return;
+      }
+
+      await alertToast(
+        `Usuario ${employeeName} eliminado y verificado en `
+        + `${response.data.successful_devices} dispositivo(s) CHIYU.`
+      );
+
+      clearSelection();
+    } catch (error) {
+      console.error("Error eliminando usuario CHIYU:", error);
+
+      await alertError(
+        getErrorMessage(
+          error,
+          "No fue posible eliminar al usuario de los dispositivos CHIYU."
+        )
+      );
+
+      await checkCardStatus(selectedEmployee);
+    } finally {
+      setActionState(null);
+    }
+  }
+
   function clearSelection() {
     setSelectedEmployee(null);
     setDevices([]);
@@ -372,6 +453,24 @@ export default function CardManager() {
                 Actualizar estado
               </button>
 
+              <button
+                type="button"
+                onClick={deleteCardFromDevices}
+                disabled={
+                  checkingStatus ||
+                  actionState !== null
+                }
+                className="inline-flex items-center gap-2 rounded-lg border border-red-300 bg-red-50 px-4 py-2 text-sm font-semibold text-red-700 hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {actionState?.action === "delete" ? (
+                  <Loader2 size={16} className="animate-spin" />
+                ) : (
+                  <Trash2 size={16} />
+                )}
+                {actionState?.action === "delete"
+                  ? "Eliminando..."
+                  : "Eliminar usuario"}
+              </button>
               <button
                 type="button"
                 onClick={clearSelection}

@@ -28,4 +28,12 @@ router.post(
   controller.changeCardStatus
 );
 
+
+router.post(
+  "/delete",
+  verifyToken,
+  checkPermission("biometric_users_enabled"),
+  controller.deleteCard
+);
+
 module.exports = router;
